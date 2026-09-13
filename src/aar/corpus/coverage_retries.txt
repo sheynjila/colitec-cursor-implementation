@@ -1,0 +1,9 @@
+Coverage and retry limits
+
+Coverage retries are limited to two total research rounds, counting the first round.
+The coverage gate retries only uncovered sub-questions and never reruns the planner.
+Each source_hint of both dispatches one web worker and one document worker, not a third worker.
+Workers share a cumulative maximum of four tool uses per sub-question across search, fetch, document retrieval, and summarization.
+
+When coverage remains incomplete because of round, source, route, or budget limits, pass explicit limitations to the writer.
+Insufficient evidence must be disclosed instead of filling gaps with invented facts.

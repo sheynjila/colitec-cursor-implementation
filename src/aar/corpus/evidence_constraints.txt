@@ -1,0 +1,7 @@
+Evidence constraints for the Colitech research assistant
+
+Evidence-grounded research assistants must validate every candidate fact against retrieved evidence.
+A candidate fact is acceptable only when its exact evidence quote appears in a source retrieved during the same run.
+Unknown URLs and absent passages cannot become facts. Missing keys, empty indexes, and unsafe links produce warnings or uncovered work, never fabricated citations.
+
+The writer receives only validated facts and approved references. If coverage is incomplete, the report must say so plainly.

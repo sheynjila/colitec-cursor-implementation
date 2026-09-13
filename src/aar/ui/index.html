@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Colitech Research Assistant</title>
+  <style>
+    :root {
+      --bg: #0f1714;
+      --panel: #16241e;
+      --ink: #e7f3ec;
+      --muted: #9bb5a8;
+      --line: #2a4036;
+      --accent: #3dbe8c;
+      --warn: #e0b25a;
+      --danger: #e07a6a;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", sans-serif;
+      background: radial-gradient(circle at top, #1d332b, var(--bg) 55%);
+      color: var(--ink);
+    }
+    header, footer { padding: 1rem 1.5rem; border-bottom: 1px solid var(--line); }
+    footer { border-top: 1px solid var(--line); border-bottom: 0; color: var(--muted); font-size: 0.85rem; }
+    h1 { margin: 0; font-size: 1.3rem; }
+    h2 { margin: 0 0 0.75rem; font-size: 1.05rem; }
+    h3 { margin: 1rem 0 0.4rem; font-size: 0.95rem; }
+    .sub { color: var(--muted); font-size: 0.9rem; }
+    main { display: grid; grid-template-columns: 340px 1fr 1fr; gap: 1rem; padding: 1rem; }
+    section { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 1rem; min-height: 70vh; }
+    label { display: block; margin: 0.6rem 0 0.25rem; color: var(--muted); font-size: 0.85rem; }
+    input, select, textarea, button {
+      width: 100%;
+      padding: 0.55rem 0.65rem;
+      border-radius: 8px;
+      border: 1px solid var(--line);
+      background: #102019;
+      color: var(--ink);
+    }
+    textarea { min-height: 7rem; resize: vertical; }
+    button { background: var(--accent); color: #062016; font-weight: 700; cursor: pointer; margin-top: 1rem; }
+    button.secondary { background: transparent; color: var(--ink); }
+    .pipeline { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-bottom: 1rem; }
+    .node {
+      font-size: 0.7rem;
+      padding: 0.25rem 0.45rem;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      color: var(--muted);
+    }
+    .node.active { border-color: var(--accent); color: var(--accent); }
+    .log { font-size: 0.85rem; line-height: 1.45; }
+    .event { color: var(--muted); margin: 0 0 0.35rem; }
+    .event strong { color: var(--ink); font-weight: 600; }
+    .status, .limit { margin-bottom: 0.75rem; color: var(--muted); }
+    .limit { color: var(--warn); }
+    .error { color: var(--danger); }
+    .banner { background: #3a2d12; color: var(--warn); padding: 0.5rem 0.7rem; border-radius: 8px; margin-bottom: 0.8rem; font-size: 0.85rem; }
+    .sources { padding-left: 1.1rem; }
+    .sources a { color: var(--accent); }
+    @media (max-width: 1100px) {
+      main { grid-template-columns: 1fr; }
+      section { min-height: auto; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Colitech Multi-Agent Research Assistant</h1>
+    <div class="sub">Evidence-grounded local research. Validated facts only.</div>
+  </header>
+  <main>
+    <section>
+      <div id="modeBanner" class="banner" hidden></div>
+      <form id="researchForm">
+        <label for="question">Research question</label>
+        <textarea id="question" required minlength="8">What evidence-grounded constraints should a multi-agent research assistant enforce?</textarea>
+        <label for="sources">Allowed sources</label>
+        <select id="sources">
+          <option value="documents">documents</option>
+          <option value="web">web</option>
+          <option value="both" selected>both</option>
+        </select>
+        <label for="depth">Desired depth</label>
+        <select id="depth">
+          <option value="brief">brief</option>
+          <option value="standard" selected>standard</option>
+          <option value="deep">deep</option>
+        </select>
+        <label for="risk">Risk level</label>
+        <select id="risk">
+          <option value="low" selected>low</option>
+          <option value="medium">medium</option>
+          <option value="high">high</option>
+        </select>
+        <label for="budget">Max cost (USD)</label>
+        <input id="budget" type="number" min="0" max="100" step="0.01" value="0" />
+        <button type="submit">Start research</button>
+      </form>
+      <p class="status" id="runStatus">No run yet.</p>
+      <form id="feedbackForm" hidden>
+        <label for="rating">Post-run rating</label>
+        <select id="rating">
+          <option value="5">5</option>
+          <option value="4">4</option>
+          <option value="3" selected>3</option>
+          <option value="2">2</option>
+          <option value="1">1</option>
+        </select>
+        <label for="note">Note</label>
+        <input id="note" maxlength="2000" placeholder="Optional note stored outside the graph" />
+        <button class="secondary" type="submit">Save feedback</button>
+      </form>
+    </section>
+    <section>
+      <h2>Progress</h2>
+      <div class="pipeline" id="pipeline"></div>
+      <div class="log" id="progressLog">Waiting for events.</div>
+    </section>
+    <section>
+      <h2>Report</h2>
+      <div id="reportPanel">The cited report will appear here.</div>
+    </section>
+  </main>
+  <footer>START → Intake → Planner → Router → Supervisor → Web/Document workers → Join → Validator → Coverage → Writer → Final QA → Learning</footer>
+  <script>
+    const NODES = ["request_intake","planner","complexity_router","research_supervisor","web_search_worker","document_search_worker","research_join","validator","coverage_gate","writer","final_qa","learning_update"];
+    const EVENTS = ["run_started","intake","plan_created","route_selected","worker_started","fact_candidate","fact_validated","coverage_decision","report_drafted","qa_completed","run_completed","run_failed"];
+    const pipeline = document.getElementById("pipeline");
+    NODES.forEach(name => {
+      const el = document.createElement("span");
+      el.className = "node";
+      el.dataset.node = name;
+      el.textContent = name.replaceAll("_", " ");
+      pipeline.appendChild(el);
+    });
+
+    let currentRunId = null;
+
+    async function loadMode() {
+      const models = await fetch("/api/models").then(r => r.json());
+      const fakeOn = models.some(m => m.alias.startsWith("fake") && m.enabled);
+      if (fakeOn) {
+        const banner = document.getElementById("modeBanner");
+        banner.hidden = false;
+        banner.textContent = "Demo/test mode is on. Fixture sources and fake models are labeled and are not live provider research.";
+      }
+    }
+    loadMode();
+
+    document.getElementById("researchForm").addEventListener("submit", async (event) => {
+      event.preventDefault();
+      document.getElementById("progressLog").textContent = "Starting run...";
+      document.getElementById("reportPanel").textContent = "Waiting for a completed report.";
+      document.getElementById("feedbackForm").hidden = true;
+      document.querySelectorAll(".node").forEach(n => n.classList.remove("active"));
+      const payload = {
+        question: document.getElementById("question").value,
+        allowed_sources: document.getElementById("sources").value,
+        desired_depth: document.getElementById("depth").value,
+        risk_level: document.getElementById("risk").value,
+        max_cost_usd: Number(document.getElementById("budget").value)
+      };
+      const created = await fetch("/api/research", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify(payload)
+      });
+      if (!created.ok) {
+        const err = await created.json().catch(() => ({ message: "Request rejected." }));
+        document.getElementById("runStatus").textContent = "Request rejected.";
+        document.getElementById("progressLog").innerHTML = `<p class="error">${escapeHtml(err.message || err.detail || "Invalid request")}</p>`;
+        return;
+      }
+      const body = await created.json();
+      currentRunId = body.run_id;
+      document.getElementById("runStatus").textContent = `Run ${body.run_id} queued.`;
+      const source = new EventSource(`/api/stream/${body.run_id}`);
+      source.onmessage = (msg) => appendEvent(JSON.parse(msg.data));
+      EVENTS.forEach(type => {
+        source.addEventListener(type, (msg) => {
+          const data = JSON.parse(msg.data);
+          appendEvent(data);
+          if (data.node) {
+            const node = document.querySelector(`[data-node="${data.node}"]`);
+            if (node) node.classList.add("active");
+          }
+          if (type === "run_completed" || type === "run_failed") {
+            source.close();
+            loadReport(body.run_id);
+          }
+        });
+      });
+    });
+
+    document.getElementById("feedbackForm").addEventListener("submit", async (event) => {
+      event.preventDefault();
+      if (!currentRunId) return;
+      const response = await fetch(`/api/runs/${currentRunId}/feedback`, {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({
+          rating: Number(document.getElementById("rating").value),
+          note: document.getElementById("note").value
+        })
+      });
+      document.getElementById("runStatus").textContent = response.ok
+        ? `Feedback saved for ${currentRunId}.`
+        : "Feedback could not be stored.";
+    });
+
+    function appendEvent(data) {
+      const log = document.getElementById("progressLog");
+      if (log.textContent === "Waiting for events." || log.textContent === "Starting run...") log.innerHTML = "";
+      const row = document.createElement("div");
+      row.className = "event";
+      row.innerHTML = `<strong>${escapeHtml(data.event_type || "event")}</strong> ${escapeHtml(data.node || "")}`;
+      log.appendChild(row);
+    }
+
+    async function loadReport(runId) {
+      const status = await fetch(`/api/runs/${runId}`).then(r => r.json());
+      const warnings = (status.warnings || []).join("; ");
+      document.getElementById("runStatus").textContent =
+        `Run ${runId} ${status.status}. spent $${Number(status.spent_usd).toFixed(4)} reserved $${Number(status.reserved_usd).toFixed(4)}`;
+      const report = await fetch(`/api/report/${runId}`).then(r => r.json());
+      const panel = document.getElementById("reportPanel");
+      if (report.error_message) {
+        panel.innerHTML = `<p class="error">${escapeHtml(report.error_message)}</p>`;
+        return;
+      }
+      if (!report.report) {
+        panel.textContent = "Report is not available yet.";
+        return;
+      }
+      const r = report.report;
+      const limitations = (report.limitations || r.limitations || []).map(escapeHtml).join("; ");
+      const sources = (report.citations || r.sources || [])
+        .map(item => `<li>[${item.number}] ${escapeHtml(item.title)} — <a href="${escapeAttr(item.ref)}">${escapeHtml(item.ref)}</a></li>`)
+        .join("");
+      const sections = (r.sections || [])
+        .map(section => `<h3>${escapeHtml(section.title)}</h3><p>${escapeHtml(section.body)}</p>`)
+        .join("");
+      panel.innerHTML = `
+        <p class="status">QA: ${escapeHtml(r.qa_status)} ${warnings ? `· ${escapeHtml(warnings)}` : ""}</p>
+        ${limitations ? `<p class="limit">Limitations: ${limitations}</p>` : ""}
+        <h3>Executive summary</h3>
+        <p>${escapeHtml(r.executive_summary)}</p>
+        ${sections}
+        <h3>Sources</h3>
+        <ol class="sources">${sources || "<li>No approved sources.</li>"}</ol>
+      `;
+      document.getElementById("feedbackForm").hidden = false;
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? "").replace(/[&<>"']/g, ch => ({
+        "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+      }[ch]));
+    }
+    function escapeAttr(value) {
+      return escapeHtml(value).replace(/`/g, "");
+    }
+  </script>
+</body>
+</html>

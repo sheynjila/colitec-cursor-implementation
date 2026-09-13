@@ -1,0 +1,9 @@
+Routing and budget rules
+
+Model routing scores each sub-question on reasoning depth, context size, tool need, risk, and accuracy need.
+Totals of 0 to 4 map to the cheap tier, 5 to 10 map to the standard tier, and 11 to 25 map to the strong tier.
+An alias is selected only after enabled status, provider availability, capability, context capacity, required tier, premium policy, and remaining budget are checked.
+Prefer the lowest projected cost among eligible aliases. Learned preference may break only same-tier ties.
+
+A zero-budget run must make zero paid model calls. Parallel workers share an atomic budget reservation.
+The selected alias must be the alias actually invoked.
